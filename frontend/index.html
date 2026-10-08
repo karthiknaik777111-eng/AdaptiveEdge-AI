@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AdaptiveEdge — On-Device Conversational AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation / Status Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-group">
+          <div class="pulse-orb"></div>
+          <div>
+            <h1 class="logo-title">AdaptiveEdge <span class="accent-text">Voice AI</span> <span class="product-badge">100% ON-DEVICE</span></h1>
+            <p class="logo-tagline">"Dynamic CPU Thread Adaptation • Tiered Local Routing • Multilingual Voice AI"</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="pill-group">
+          <span class="status-pill status-local" id="status-local-pill" title="Fully on-device inference">
+            <span class="dot green-dot"></span> LOCAL INFERENCE: ON
+          </span>
+          <span class="status-pill status-cloud" id="status-cloud-pill" title="No external cloud AI APIs">
+            <span class="dot red-dot"></span> CLOUD AI: OFF
+          </span>
+          <span class="status-pill status-arch" id="status-arch-pill" title="Zero GPU requirement">
+            <span class="dot cyan-dot"></span> CPU-ONLY
+          </span>
+          <span class="status-pill status-battery" id="status-battery-pill" title="Hardware Power Telemetry">
+            <span class="dot green-dot" id="battery-dot"></span> <span id="battery-text">BATTERY: 100% (AC)</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="mode-control">
+          <span class="mode-label">RESOURCE MODE:</span>
+          <div class="mode-selector">
+            <button class="mode-btn active" data-mode="Auto" id="mode-auto" title="Automatically adapt AI threads to CPU load">Auto</button>
+            <button class="mode-btn" data-mode="Performance" id="mode-perf" title="High allocation: 8 AI threads">Perf</button>
+            <button class="mode-btn" data-mode="Balanced" id="mode-bal" title="Balanced allocation: 4 AI threads">Balanced</button>
+            <button class="mode-btn" data-mode="Resource-Safe" id="mode-safe" title="Safe allocation: 2 AI threads">Resource-Safe</button>
+            <button class="mode-btn" data-mode="Survival" id="mode-surv" title="Minimal allocation: 2 AI threads">Survival</button>
+            <button class="mode-btn mode-btn-sim" data-mode="Constrained" id="mode-sim" title="Constrained Device Simulation (2 threads, 15 tokens)">Constrained</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Configuration Strip: Multilingual ASR, Streaming & Adaptation Demo -->
+    <section class="config-strip">
+      <div class="config-col">
+        <label for="asr-backend-select" class="config-label">ASR BACKEND:</label>
+        <select id="asr-backend-select" class="config-select">
+          <option value="whisper.cpp" selected>whisper.cpp (ggml-tiny int8) [~435ms]</option>
+          <option value="faster-whisper">faster-whisper (tiny int8)</option>
+        </select>
+      </div>
+
+      <div class="config-col">
+        <label for="asr-language-select" class="config-label">LANGUAGE:</label>
+        <select id="asr-language-select" class="config-select">
+          <option value="" selected>Auto-Detect (Multilingual)</option>
+          <option value="en">English (en)</option>
+          <option value="es">Spanish (es)</option>
+          <option value="fr">French (fr)</option>
+          <option value="de">German (de)</option>
+          <option value="hi">Hindi (hi)</option>
+          <option value="zh">Chinese (zh)</option>
+          <option value="ja">Japanese (ja)</option>
+          <option value="it">Italian (it)</option>
+        </select>
+      </div>
+
+      <div class="config-col toggle-col">
+        <label class="toggle-container compact-toggle">
+          <input type="checkbox" id="translate-toggle">
+          <span class="checkmark"></span>
+          <span class="toggle-label">Translate Speech to English</span>
+        </label>
+      </div>
+
+      <div class="config-col toggle-col">
+        <label class="toggle-container compact-toggle">
+          <input type="checkbox" id="streaming-tts-toggle" checked>
+          <span class="checkmark"></span>
+          <span class="toggle-label">Low-Latency Streaming TTS (Fast TTFA)</span>
+        </label>
+      </div>
+
+      <!-- Safe Adaptation Demo Button -->
+      <div class="config-col">
+        <button class="stress-btn" id="stress-btn" title="Simulate controlled 7-second CPU workload to demonstrate dynamic AI thread throttling">
+          <span id="stress-btn-icon">⚡</span> <span id="stress-btn-text">Safe Stress Test</span>
+        </button>
+      </div>
+
+      <div class="config-col nav-col">
+        <div class="tab-switch-group">
+          <button class="tab-btn active" id="tab-btn-live">Conversational Stream</button>
+          <button class="tab-btn" id="tab-btn-bench">Performance Benchmark</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Real-time Hardware Telemetry Bar -->
+    <section class="telemetry-bar">
+      <!-- CPU Metric & Dynamic Thread Allocation -->
+      <div class="telemetry-card" id="card-cpu">
+        <div class="card-header">
+          <span class="metric-name">DYNAMIC CPU ALLOCATION</span>
+          <span class="metric-cores" id="cores-count">16 THREADS</span>
+        </div>
+        <div class="metric-value-row">
+          <span class="metric-value" id="cpu-percent">0.0%</span>
+          <span class="metric-sub highlight-threads" id="ai-threads-badge">AI Threads: 8 / 16</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill fill-cpu" id="cpu-progress" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- RAM Metric -->
+      <div class="telemetry-card" id="card-ram">
+        <div class="card-header">
+          <span class="metric-name">RAM UTILIZATION</span>
+          <span class="metric-sub" id="ram-numbers">0 / 16 GB</span>
+        </div>
+        <div class="metric-value-row">
+          <span class="metric-value" id="ram-percent">0.0%</span>
+          <span class="metric-sub" id="proc-rss">RSS: 0 MB</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill fill-ram" id="ram-progress" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Semantic Cache Efficiency -->
+      <div class="telemetry-card" id="card-cache">
+        <div class="card-header">
+          <span class="metric-name">TIER 1 LOCAL CACHE</span>
+          <span class="metric-sub" id="cache-totals">0 Queries</span>
+        </div>
+        <div class="metric-value-row">
+          <span class="metric-value" id="cache-hit-rate">0.0%</span>
+          <span class="metric-sub" id="cache-hits-misses">0 Hits / 0 Misses</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill fill-cache" id="cache-progress" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- End-to-End & TTFA Latency Metric -->
+      <div class="telemetry-card" id="card-latency">
+        <div class="card-header">
+          <span class="metric-name">TIME TO FIRST AUDIO (TTFA)</span>
+          <span class="metric-sub">Speech End &rarr; Audible Sound</span>
+        </div>
+        <div class="metric-value-row">
+          <span class="metric-value latency-highlight" id="last-ttfa-latency">-- ms</span>
+          <span class="metric-sub" id="last-routing-badge">READY</span>
+        </div>
+        <div class="latency-mini-bar">
+          <span class="stage-pill" id="pill-asr">ASR: --</span>
+          <span class="stage-pill" id="pill-router">Router: --</span>
+          <span class="stage-pill" id="pill-ttft">TTFT: --</span>
+          <span class="stage-pill" id="pill-tts">TTS: --</span>
+          <span class="stage-pill" id="pill-e2e">Total: --</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Adaptive State & Processing Path Ribbon -->
+    <section class="adaptation-ribbon">
+      <div class="ribbon-box">
+        <span class="ribbon-label">DYNAMIC RESOURCE POLICY:</span>
+        <span class="ribbon-val mode-active-pill" id="active-policy-badge">PERFORMANCE (Auto)</span>
+        <span class="ribbon-detail" id="active-policy-detail">AI Threads: 8 • Available: 16 • Max Tokens: 80 • Sim Threshold: 0.65</span>
+      </div>
+      <div class="ribbon-box flowchart-box">
+        <span class="ribbon-label">PROCESSING PIPELINE:</span>
+        <div class="processing-flowchart" id="processing-flowchart">
+          <span class="flow-step" id="flow-mic">🎤 Speech</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" id="flow-vad">VAD</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" id="flow-asr">Whisper ASR</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" id="flow-router">Semantic Router</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step flow-decision" id="flow-decision">Decision</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" id="flow-llm">Local LLM</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" id="flow-tts">Streaming TTS</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" id="flow-speaker">🔊 Speaker</span>
+        </div>
+      </div>
+      <div class="ribbon-box audio-state-box">
+        <span class="ribbon-label">VOICE OUTPUT STATUS:</span>
+        <div class="audio-state-row">
+          <span class="audio-status-pill audio-idle" id="audio-status-pill">
+            <span class="audio-pulse-dot" id="audio-pulse-dot"></span>
+            <span id="audio-status-text">Audio Ready</span>
+          </span>
+          <button class="replay-btn" id="replay-last-btn" title="Replay the last synthesized voice response" disabled>
+            🔊 Replay
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Autoplay Permission Notice (Only displays if browser policy blocks audio) -->
+    <div class="autoplay-banner" id="autoplay-banner" style="display: none;">
+      <span class="autoplay-text">🔇 Browser audio output requires user interaction. Click anywhere or press the button below to enable audio.</span>
+      <button class="unlock-audio-btn" id="unlock-audio-btn">🔊 Enable Audio Playback</button>
+    </div>
+
+    <!-- Main Workspace Grid -->
+    <main class="main-grid">
+      <!-- Left Column: Voice Interaction & Control Deck -->
+      <section class="panel control-panel">
+        <div class="panel-header">
+          <h2>Voice Interaction Controller</h2>
+          <div class="device-badge" id="mic-status-badge">
+            <span class="dot gray-dot" id="mic-indicator-dot"></span>
+            <span id="mic-status-text">Microphone Idle</span>
+          </div>
+        </div>
+
+        <!-- Microphone Interactive Target -->
+        <div class="mic-stage" id="mic-stage">
+          <div class="mic-glow-ring" id="mic-glow"></div>
+          <button class="mic-button" id="mic-toggle-btn" title="Toggle Live Microphone Listening" aria-label="Toggle Microphone">
+            <svg class="mic-icon" id="mic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </button>
+          <div class="mic-status-label" id="mic-action-caption">Click to Start Listening</div>
+          <div class="listening-state-badge" id="state-badge">STATE: IDLE</div>
+          <div class="mic-error-msg" id="mic-error-msg" style="display:none;"></div>
+        </div>
+
+        <!-- System Verification Prompts -->
+        <div class="test-actions-box">
+          <div class="box-label">SYSTEM VERIFICATION PROMPTS</div>
+          <div class="quick-buttons-grid">
+            <button class="test-btn" data-query="Can you tell me your office timing?">
+              <span class="test-tag sem-tag">Semantic Hit</span> "Can you tell me your office timing?"
+            </button>
+            <button class="test-btn" data-query="What is your memory consumption?">
+              <span class="test-tag sem-tag">Semantic Hit</span> "What is your memory consumption?"
+            </button>
+            <button class="test-btn" data-query="What is your name?">
+              <span class="test-tag hit-tag">Exact Hit</span> "What is your name?"
+            </button>
+            <button class="test-btn" data-query="What time is it?">
+              <span class="test-tag hit-tag">Dynamic Rule</span> "What time is it?"
+            </button>
+            <button class="test-btn" data-query="Explain what a neural network is in simple words.">
+              <span class="test-tag miss-tag">Cache Miss</span> "Explain neural network"
+            </button>
+            <button class="test-btn" data-query="¿Qué hora es?">
+              <span class="test-tag multi-tag">ES Hit</span> "¿Qué hora es?" (Spanish)
+            </button>
+            <button class="test-btn" data-query="Quel est ton nom ?">
+              <span class="test-tag multi-tag">FR Hit</span> "Quel est ton nom ?" (French)
+            </button>
+            <button class="test-btn" data-query="Wie ist das Wetter heute?">
+              <span class="test-tag multi-tag">DE Hit</span> "Wie ist das Wetter?" (German)
+            </button>
+          </div>
+        </div>
+
+        <!-- Manual Text Input Test Form -->
+        <form class="text-input-form" id="text-query-form">
+          <input 
+            type="text" 
+            id="query-input" 
+            class="query-input" 
+            placeholder="Type query to test router, multilingual ASR &amp; local LLM..." 
+            autocomplete="off"
+          />
+          <button type="submit" class="send-btn" id="send-btn">
+            <span>Send</span>
+          </button>
+        </form>
+
+        <!-- Audio File Upload for Direct Speech Audio Testing -->
+        <div class="audio-upload-box">
+          <div class="box-sublabel">TEST MULTILINGUAL WAV SPEECH FILE:</div>
+          <div class="upload-row">
+            <input type="file" id="wav-file-input" accept=".wav" class="file-input" />
+            <button type="button" class="upload-btn" id="upload-wav-btn">Test Audio File</button>
+          </div>
+        </div>
+
+        <!-- Audio Output Settings -->
+        <div class="audio-settings-row">
+          <label class="toggle-container">
+            <input type="checkbox" id="speaker-toggle" checked>
+            <span class="checkmark"></span>
+            <span class="toggle-label">Play Output through Speaker</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Right Column: Tabs (Live Stream vs Performance Benchmark) -->
+      <section class="panel stream-panel">
+        
+        <!-- Tab 1: Live Conversation Stream & Latency Waterfall -->
+        <div class="tab-content" id="tab-view-live">
+          <div class="panel-header">
+            <h2>Conversational Stream &amp; Latency Waterfall</h2>
+            <div class="header-action-group">
+              <button class="clear-btn" id="clear-stream-btn">Clear Log</button>
+            </div>
+          </div>
+
+          <!-- Latest Latency Breakdown Banner (T0..T5) -->
+          <div class="waterfall-card" id="waterfall-card">
+            <div class="waterfall-header">
+              <div class="waterfall-title">DETAILED LATENCY WATERFALL (T0 &rarr; T5)</div>
+              <div class="route-badge-container" id="route-badge-container">
+                <span class="route-badge idle-badge" id="latest-route-badge">AWAITING INPUT</span>
+              </div>
+            </div>
+
+            <div class="waterfall-grid waterfall-grid-clean">
+              <div class="wf-item">
+                <span class="wf-label">1. Local ASR (T1 - T0)</span>
+                <span class="wf-value" id="wf-asr">-- ms</span>
+              </div>
+              <div class="wf-item">
+                <span class="wf-label">2. Semantic Router (T2 - T1)</span>
+                <span class="wf-value" id="wf-router">-- ms</span>
+              </div>
+              <div class="wf-item">
+                <span class="wf-label">3. LLM TTFT (T3 - T2)</span>
+                <span class="wf-value" id="wf-ttft">-- ms</span>
+              </div>
+              <div class="wf-item wf-highlight-item">
+                <span class="wf-label">4. Time to 1st Audio (T4 - T0)</span>
+                <span class="wf-value highlight-val" id="wf-ttfa">-- ms</span>
+              </div>
+              <div class="wf-item">
+                <span class="wf-label">5. TTS Synthesis</span>
+                <span class="wf-value" id="wf-tts">-- ms</span>
+              </div>
+              <div class="wf-item wf-total">
+                <span class="wf-label">TOTAL E2E (T5 - T0)</span>
+                <span class="wf-value total-val" id="wf-e2e">-- ms</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conversation History Stream -->
+          <div class="conversation-feed" id="conversation-feed">
+            <div class="empty-state" id="empty-state">
+              <div class="empty-icon">🎙️</div>
+              <p>Click "Start Listening" or use one of the quick test verification prompts.</p>
+              <p class="empty-sub">Microphone &rarr; VAD &rarr; Whisper ASR &rarr; Tiered Semantic Router &rarr; Cache/LLM &rarr; Streaming TTS &rarr; Speaker</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Performance Benchmark & Ablation Panel -->
+        <div class="tab-content" id="tab-view-bench" style="display: none;">
+          <div class="panel-header">
+            <h2>Performance Benchmark &amp; Ablation Panel</h2>
+            <div class="bench-actions">
+              <button class="bench-btn run-bench-btn" id="run-bench-btn">
+                <span class="btn-spinner" id="bench-spinner" style="display: none;">⏳</span> Run Live Benchmark
+              </button>
+              <button class="bench-btn export-btn" id="export-csv-btn">Export CSV</button>
+              <button class="bench-btn export-btn" id="export-json-btn">Export JSON</button>
+            </div>
+          </div>
+
+          <!-- Research Question Callout -->
+          <div class="research-callout">
+            <div class="research-title">CORE RESEARCH QUESTION:</div>
+            <div class="research-body">
+              "How much unnecessary computation can be avoided when lightweight local routing and dynamic thread adaptation are used on-device?"
+            </div>
+            <div class="research-sub" id="research-summary-stat">
+              Measured live on this machine using real end-to-end execution. Zero fabricated data.
+            </div>
+          </div>
+
+          <!-- Comparison Table -->
+          <div class="table-container">
+            <table class="benchmark-table" id="benchmark-table">
+              <thead>
+                <tr>
+                  <th>Performance Metric</th>
+                  <th>Baseline (Standard Pipeline)</th>
+                  <th>AdaptiveEdge (Tiered+Adaptive)</th>
+                  <th>Measured Delta / Benefit</th>
+                </tr>
+              </thead>
+              <tbody id="benchmark-table-body">
+                <tr>
+                  <td><strong>End-to-End Latency</strong></td>
+                  <td id="bench-base-e2e">-- ms</td>
+                  <td id="bench-edge-e2e">-- ms</td>
+                  <td class="delta-positive" id="bench-delta-e2e">--</td>
+                </tr>
+                <tr>
+                  <td><strong>Time to First Audio (TTFA)</strong></td>
+                  <td id="bench-base-ttfa">-- ms</td>
+                  <td id="bench-edge-ttfa">-- ms</td>
+                  <td class="delta-positive" id="bench-delta-ttfa">--</td>
+                </tr>
+                <tr>
+                  <td><strong>Cache-Hit Response Latency</strong></td>
+                  <td id="bench-base-hit-lat">N/A (Always LLM)</td>
+                  <td id="bench-edge-hit-lat">-- ms</td>
+                  <td class="delta-positive" id="bench-delta-hit-lat">Instant Tier 1 Response</td>
+                </tr>
+                <tr>
+                  <td><strong>Cache-Miss Response Latency</strong></td>
+                  <td id="bench-base-miss-lat">-- ms</td>
+                  <td id="bench-edge-miss-lat">-- ms</td>
+                  <td id="bench-delta-miss-lat">--</td>
+                </tr>
+                <tr>
+                  <td><strong>LLM Invocations Required</strong></td>
+                  <td id="bench-base-llm-calls">10 / 10 (100%)</td>
+                  <td id="bench-edge-llm-calls">--</td>
+                  <td class="delta-positive" id="bench-delta-llm-calls">--</td>
+                </tr>
+                <tr>
+                  <td><strong>Process RAM Consumption</strong></td>
+                  <td id="bench-base-ram">-- MB RSS</td>
+                  <td id="bench-edge-ram">-- MB RSS</td>
+                  <td id="bench-delta-ram">Minimal Router Overhead (&lt;35MB)</td>
+                </tr>
+                <tr>
+                  <td><strong>Peak CPU Usage</strong></td>
+                  <td id="bench-base-cpu">-- %</td>
+                  <td id="bench-edge-cpu">-- %</td>
+                  <td id="bench-delta-cpu">CPU Bound to Inferences</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Ablation Summary Stats Grid -->
+          <div class="ablation-stats-grid" id="ablation-stats-grid">
+            <div class="ablation-stat-card">
+              <span class="stat-number delta-positive" id="stat-llm-avoided">--%</span>
+              <span class="stat-label">LLM Calls Avoided</span>
+            </div>
+            <div class="ablation-stat-card">
+              <span class="stat-number delta-positive" id="stat-ttfa-speedup">--x</span>
+              <span class="stat-label">TTFA Speedup on Cache Hit</span>
+            </div>
+            <div class="ablation-stat-card">
+              <span class="stat-number" id="stat-asr-benchmark">~435 ms</span>
+              <span class="stat-label">whisper.cpp ASR Latency</span>
+            </div>
+            <div class="ablation-stat-card">
+              <span class="stat-number" id="stat-router-avg">~8 ms</span>
+              <span class="stat-label">Semantic Router Latency</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+    <!-- Footer System Specs -->
+    <footer class="footer">
+      <div class="spec-col">
+        <span class="spec-label">SPEECH RECOGNITION:</span>
+        <span class="spec-val" id="footer-asr-spec">whisper.cpp (ggml-tiny int8 CPU, ~435ms, Multilingual)</span>
+      </div>
+      <div class="spec-col">
+        <span class="spec-label">LOCAL ROUTER:</span>
+        <span class="spec-val">all-MiniLM-L6-v2 Dense Local Vector Search</span>
+      </div>
+      <div class="spec-col">
+        <span class="spec-label">QUANTIZED LLM:</span>
+        <span class="spec-val">Qwen2.5-0.5B-Instruct-Q4_K_M (llama.cpp AVX2)</span>
+      </div>
+      <div class="spec-col">
+        <span class="spec-label">RESOURCE CONTROLLER:</span>
+        <span class="spec-val">Dynamic CPU Thread / Core Adaptation</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+# Virtual environment
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Runtime audio temporary files
+*.wav
+tts_*.wav
+static/audio/*.wav
+
+# Model binaries (downloaded via script / HuggingFace)
+models/whisper/
+models/whispercpp/
+models/embeddings/
+models/.cache/
+models/*.gguf
+models/*.bin
+
+# System & OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+
+# IDE & Editor files
+.vscode/
+.idea/
+.agents/
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Python testing and coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Runtime data and generated files
+cache/
+*.wav
+*.mp3
+*.pcm
+
+# Large model files
+*.gguf
+*.safetensors
+pytorch_model*.bin
+
+# Internal project specification files
+/spec.md
+/spec.md 1
+/spec.md2
+/spec.md4
